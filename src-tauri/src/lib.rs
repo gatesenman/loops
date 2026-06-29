@@ -118,8 +118,13 @@ pub fn run() {
             app.manage(store);
 
             // Register the summon hotkey (restored from settings, default Alt+Space).
-            apply_hotkey(app.handle(), &combo)
-                .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            // Non-fatal: on some Windows installations the default Alt+Space
+            // conflicts with the system window-menu shortcut and registration
+            // fails.  Rather than crashing the whole app the user can pick a
+            // different combo from Settings later.
+            if let Err(e) = apply_hotkey(app.handle(), &combo) {
+                eprintln!("[loops-desktop] failed to register hotkey '{combo}': {e}");
+            }
 
             // Tray with show/quit.
             let open_item = MenuItem::with_id(app, "open", "Open Loops", true, None::<&str>)?;
@@ -128,8 +133,11 @@ pub fn run() {
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open_item, &bar_item, &quit_item])?;
 
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+            let mut tray = TrayIconBuilder::new();
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray
                 .menu(&menu)
                 .tooltip("Loops Desktop")
                 .on_menu_event(|app, event| match event.id().as_ref() {
@@ -176,5 +184,12 @@ pub fn run() {
             commands::app_info,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            // With `windows_subsystem = "windows"` there is no console, so
+            // write a crash log the user can inspect.
+            let log = std::env::temp_dir().join("loops-desktop-crash.log");
+            let msg = format!("Loops Desktop failed to start: {e}");
+            let _ = std::fs::write(&log, &msg);
+            eprintln!("{msg}");
+        });
 }
