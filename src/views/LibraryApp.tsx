@@ -165,6 +165,7 @@ export default function LibraryApp() {
       <LoopWizard
         existing={loops}
         defaultVisibility={settings.defaultVisibility}
+        aiSettings={settings.ai}
         onCancel={() => goList()}
         onSave={onSave}
       />

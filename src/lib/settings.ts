@@ -10,11 +10,26 @@ export type HotkeyCombo =
   | "Alt+Shift+Space"
   | "Ctrl+Shift+Space";
 
+export type AiProvider =
+  | "openai"
+  | "anthropic"
+  | "deepseek"
+  | "gemini"
+  | "custom";
+
+export interface AiSettings {
+  provider: AiProvider;
+  apiKey: string;
+  model?: string;
+  baseUrl?: string;
+}
+
 export interface AppSettings {
   accent: string;
   defaultVisibility: Visibility;
   hotkey: HotkeyCombo;
   hideOnBlur: boolean;
+  ai?: AiSettings;
 }
 
 export interface AppInfo {
@@ -79,6 +94,45 @@ export async function clearAssets(): Promise<void> {
 export async function getAppInfo(): Promise<AppInfo> {
   const info = await invoke<{ version: string; data_dir: string }>("app_info");
   return { version: info.version, dataDir: info.data_dir };
+}
+
+export const AI_PROVIDERS: { id: AiProvider; label: string; defaultModel: string }[] = [
+  { id: "openai", label: "OpenAI", defaultModel: "gpt-4o-mini" },
+  { id: "anthropic", label: "Claude (Anthropic)", defaultModel: "claude-sonnet-4-20250514" },
+  { id: "deepseek", label: "DeepSeek", defaultModel: "deepseek-chat" },
+  { id: "gemini", label: "Gemini (Google)", defaultModel: "gemini-2.5-flash" },
+  { id: "custom", label: "Custom (OpenAI Compatible)", defaultModel: "" },
+];
+
+export interface GeneratedLoop {
+  title: string;
+  description: string;
+  goal: string;
+  instructions: string;
+  stopCondition: string;
+  maxIterations: number;
+  triggerKeyword: string;
+  tags: string[];
+  variables: {
+    name: string;
+    label: string;
+    type: string;
+    required: boolean;
+    default: string;
+  }[];
+}
+
+export async function generateLoop(
+  prompt: string,
+  ai: AiSettings,
+): Promise<GeneratedLoop> {
+  return invoke<GeneratedLoop>("generate_loop", {
+    prompt,
+    provider: ai.provider,
+    apiKey: ai.apiKey,
+    model: ai.model || null,
+    baseUrl: ai.baseUrl || null,
+  });
 }
 
 // Apply an accent preset to the document root so the entire UI re-themes live.

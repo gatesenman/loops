@@ -3,12 +3,14 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Visibility } from "../types/asset";
 import {
   ACCENTS,
+  AI_PROVIDERS,
   applyAccent,
   clearAssets,
   getAppInfo,
   HOTKEYS,
   saveSettings,
   setHotkey,
+  type AiProvider,
   type AppInfo,
   type AppSettings,
   type HotkeyCombo,
@@ -129,6 +131,108 @@ export default function SettingsView({
             ))}
           </select>
         </div>
+      </section>
+
+      <section className="settings__group">
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">AI 模型提供商</span>
+            <span className="settings__desc">
+              用于 AI 生成 Loop 功能。选择你的 AI 提供商并填入 API Key。
+            </span>
+          </div>
+          <select
+            className="settings__select"
+            value={settings.ai?.provider ?? "openai"}
+            onChange={(e) => {
+              const provider = e.target.value as AiProvider;
+              const defaultModel =
+                AI_PROVIDERS.find((p) => p.id === provider)?.defaultModel ?? "";
+              update({
+                ai: {
+                  ...(settings.ai ?? { provider: "openai", apiKey: "" }),
+                  provider,
+                  model: defaultModel,
+                  baseUrl: undefined,
+                },
+              });
+            }}
+          >
+            {AI_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">API Key</span>
+            <span className="settings__desc">你的 API 密钥，仅存储在本地。</span>
+          </div>
+          <input
+            type="password"
+            className="settings__input"
+            style={{ width: 220, fontSize: 13, padding: "7px 11px" }}
+            placeholder="sk-..."
+            value={settings.ai?.apiKey ?? ""}
+            onChange={(e) =>
+              update({
+                ai: {
+                  ...(settings.ai ?? { provider: "openai", apiKey: "" }),
+                  apiKey: e.target.value,
+                },
+              })
+            }
+          />
+        </div>
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">模型名称</span>
+            <span className="settings__desc">留空使用默认模型。</span>
+          </div>
+          <input
+            className="settings__input"
+            style={{ width: 220, fontSize: 13, padding: "7px 11px" }}
+            placeholder={
+              AI_PROVIDERS.find((p) => p.id === (settings.ai?.provider ?? "openai"))
+                ?.defaultModel ?? ""
+            }
+            value={settings.ai?.model ?? ""}
+            onChange={(e) =>
+              update({
+                ai: {
+                  ...(settings.ai ?? { provider: "openai", apiKey: "" }),
+                  model: e.target.value,
+                },
+              })
+            }
+          />
+        </div>
+        {(settings.ai?.provider === "custom") && (
+          <div className="settings__row">
+            <div className="settings__label">
+              <span className="settings__name">Base URL</span>
+              <span className="settings__desc">
+                自定义 OpenAI 兼容 API 地址。
+              </span>
+            </div>
+            <input
+              className="settings__input"
+              style={{ width: 280, fontSize: 13, padding: "7px 11px" }}
+              placeholder="https://api.example.com/v1/chat/completions"
+              value={settings.ai?.baseUrl ?? ""}
+              onChange={(e) =>
+                update({
+                  ai: {
+                    ...(settings.ai ?? { provider: "custom", apiKey: "" }),
+                    baseUrl: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+        )}
       </section>
 
       <section className="settings__group">

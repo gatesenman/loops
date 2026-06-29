@@ -11,6 +11,11 @@ import { slugify } from "../lib/draft";
 import { LOOP_TEMPLATES, templateToDraft } from "../lib/templates";
 import { dryRunLoop, validateLoopDraft } from "../lib/validate";
 import { TemplateIcon } from "./icons";
+import {
+  generateLoop,
+  type AiSettings,
+  type GeneratedLoop,
+} from "../lib/settings";
 
 const STEPS = ["选择模板", "填写内容", "触发与范围", "校验与测试"];
 
@@ -20,11 +25,13 @@ const STEPS = ["选择模板", "填写内容", "触发与范围", "校验与测�
 export default function LoopWizard({
   existing,
   defaultVisibility = "private",
+  aiSettings,
   onSave,
   onCancel,
 }: {
   existing: Asset[];
   defaultVisibility?: Visibility;
+  aiSettings?: AiSettings;
   onSave: (draft: AssetDraft) => void;
   onCancel: () => void;
 }) {
@@ -36,6 +43,66 @@ export default function LoopWizard({
   const [pickedId, setPickedId] = useState(LOOP_TEMPLATES[0].id);
   const [testValues, setTestValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  // AI generation state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const hasAiKey = !!(aiSettings?.apiKey);
+
+  const applyGenerated = (gen: GeneratedLoop) => {
+    const draft: AssetDraft = {
+      kind: "loop",
+      title: gen.title,
+      slug: "",
+      description: gen.description,
+      category: "",
+      tags: gen.tags,
+      visibility: defaultVisibility,
+      version: "1.0.0",
+      variables: gen.variables.map((v) => ({
+        name: v.name,
+        label: v.label,
+        type: v.type as "text" | "path" | "enum" | "number",
+        required: v.required,
+        default: v.default,
+        options: [],
+      })),
+      triggers: gen.triggerKeyword
+        ? [{ trigger: "/", keyword: gen.triggerKeyword }]
+        : [],
+      scope: { appliesTo: ["all"] },
+      payload: {
+        goal: gen.goal,
+        instructions: gen.instructions,
+        stopCondition: gen.stopCondition,
+        maxIterations: gen.maxIterations,
+      } as LoopPayload,
+    };
+    setD(draft);
+    setPickedId("__ai__");
+    setTestValues(
+      Object.fromEntries(
+        gen.variables.map((v) => [v.name, v.default ?? ""]),
+      ),
+    );
+    setStep(1);
+  };
+
+  const doGenerate = async () => {
+    if (!aiSettings || !aiPrompt.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const gen = await generateLoop(aiPrompt, aiSettings);
+      applyGenerated(gen);
+    } catch (e) {
+      setAiError(String(e));
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const payload = d.payload as LoopPayload;
   const setPayload = (patch: Partial<LoopPayload>) =>
@@ -128,6 +195,52 @@ export default function LoopWizard({
             挑一个最接近你需求的模板快速开始，下一步可随意修改。Loop 通过{" "}
             <code>/</code> 斜杠命令唤起。
           </p>
+
+          {/* AI generation section */}
+          <div className="ai-gen">
+            <div className="ai-gen__header">
+              <span className="ai-gen__icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1a3 3 0 0 1 3 3v1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1a3 3 0 0 1-3 3h-1a4 4 0 0 1-4-4 4 4 0 0 1-4 4H5a3 3 0 0 1-3-3H1a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2V9a3 3 0 0 1 3-3V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg>
+              </span>
+              <span className="ai-gen__title">AI 生成</span>
+              <span className="ai-gen__desc">描述你想要的 Loop，AI 帮你生成初稿，然后微调</span>
+            </div>
+            {hasAiKey ? (
+              <div className="ai-gen__form">
+                <textarea
+                  className="ai-gen__input"
+                  rows={2}
+                  placeholder="描述你想要的 Loop 功能，例如：帮我自动修复 lint 错误直到全部通过..."
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !aiLoading) {
+                      e.preventDefault();
+                      doGenerate();
+                    }
+                  }}
+                  disabled={aiLoading}
+                />
+                <button
+                  className="btn btn--primary ai-gen__btn"
+                  disabled={!aiPrompt.trim() || aiLoading}
+                  onClick={doGenerate}
+                >
+                  {aiLoading ? "生成中..." : "AI 生成"}
+                </button>
+                {aiError && (
+                  <div className="ai-gen__error">{aiError}</div>
+                )}
+              </div>
+            ) : (
+              <p className="ai-gen__hint muted">
+                请先在「设置」中配置 AI 提供商和 API Key
+              </p>
+            )}
+          </div>
+
+          <p className="muted" style={{ marginTop: 20 }}>或从预设模板选择：</p>
+
           <div className="tpl-grid">
             {LOOP_TEMPLATES.map((t) => (
               <button

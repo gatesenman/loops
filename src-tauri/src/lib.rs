@@ -182,6 +182,7 @@ pub fn run() {
             commands::set_hotkey,
             commands::clear_assets,
             commands::app_info,
+            commands::generate_loop,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
