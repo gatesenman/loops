@@ -5,6 +5,7 @@ import { renderLoop } from "../lib/render";
 import { bumpCopies, injectText } from "../lib/api";
 import VariableForm from "./VariableForm";
 import ConfirmDialog from "./ConfirmDialog";
+import { showToast } from "./Toast";
 
 // Full loop view: shows the loop's spec, lets the user fill variables, preview
 // the rendered output, and inject it (M1 = copy to clipboard).
@@ -34,6 +35,7 @@ export default function LoopDetail({
     await injectText(rendered);
     void bumpCopies(asset.id);
     setCopied(true);
+    showToast("已复制到剪贴板");
     setTimeout(() => setCopied(false), 1800);
   };
 
@@ -41,17 +43,17 @@ export default function LoopDetail({
     <div className="detail">
       <div className="detail__bar">
         <button className="btn btn--ghost" onClick={onBack}>
-          ← Back
+          ← 返回
         </button>
         <div className="row">
           <button className="btn" onClick={() => onEdit(asset)}>
-            Edit
+            编辑
           </button>
           <button
             className="btn btn--danger"
             onClick={() => setConfirmingDelete(true)}
           >
-            Delete
+            删除
           </button>
         </div>
       </div>
@@ -79,13 +81,13 @@ export default function LoopDetail({
       </div>
 
       <section>
-        <h3>Goal</h3>
+        <h3>目标</h3>
         <p>{payload.goal || <span className="muted">—</span>}</p>
-        <h3>Instructions</h3>
+        <h3>指令</h3>
         <pre className="block">{payload.instructions || "—"}</pre>
         {payload.stopCondition && (
           <>
-            <h3>Stop condition</h3>
+            <h3>停止条件</h3>
             <p>{payload.stopCondition}</p>
           </>
         )}
@@ -93,7 +95,7 @@ export default function LoopDetail({
 
       {asset.variables.length > 0 && (
         <section>
-          <h3>Variables</h3>
+          <h3>变量</h3>
           <VariableForm
             variables={asset.variables}
             values={values}
@@ -103,13 +105,13 @@ export default function LoopDetail({
       )}
 
       <section>
-        <h3>Preview</h3>
+        <h3>预览</h3>
         <pre className="block block--preview">{rendered}</pre>
       </section>
 
       <div className="detail__actions">
         <button className="btn btn--primary" onClick={onRun}>
-          {copied ? "Copied to clipboard ✓" : "Run → copy to clipboard"}
+          {copied ? "已复制到剪贴板 ✓" : "运行 → 复制到剪贴板"}
         </button>
       </div>
 

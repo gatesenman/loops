@@ -73,26 +73,26 @@ export default function LoopEditor({
     <div className="editor">
       <div className="detail__bar">
         <button className="btn btn--ghost" onClick={onCancel}>
-          ← Cancel
+          ← 取消
         </button>
         <button className="btn btn--primary" disabled={!canSave} onClick={submit}>
-          Save loop
+          保存 Loop
         </button>
       </div>
 
-      <h1>{draft.id ? "Edit loop" : "New loop"}</h1>
+      <h1>{draft.id ? "编辑 Loop" : "新建 Loop"}</h1>
 
       <label className="field">
-        <span className="field__label">Title*</span>
+        <span className="field__label">标题*</span>
         <input
           value={d.title}
           onChange={(e) => setD({ ...d, title: e.target.value })}
-          placeholder="e.g. Fix failing tests until green"
+          placeholder="例如：修复失败测试直到通过"
         />
       </label>
 
       <label className="field">
-        <span className="field__label">Description</span>
+        <span className="field__label">描述</span>
         <input
           value={d.description ?? ""}
           onChange={(e) => setD({ ...d, description: e.target.value })}
@@ -101,20 +101,20 @@ export default function LoopEditor({
 
       <div className="row">
         <label className="field">
-          <span className="field__label">Visibility</span>
+          <span className="field__label">可见性</span>
           <select
             value={d.visibility}
             onChange={(e) =>
               setD({ ...d, visibility: e.target.value as Visibility })
             }
           >
-            <option value="private">private</option>
-            <option value="unlisted">unlisted</option>
-            <option value="public">public</option>
+            <option value="private">私有</option>
+            <option value="unlisted">未公开</option>
+            <option value="public">公开</option>
           </select>
         </label>
         <label className="field">
-          <span className="field__label">Tags (comma separated)</span>
+          <span className="field__label">标签（逗号分隔）</span>
           <input
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
@@ -124,36 +124,36 @@ export default function LoopEditor({
       </div>
 
       <label className="field">
-        <span className="field__label">Goal</span>
+        <span className="field__label">目标 Goal</span>
         <textarea
           rows={2}
           value={payload.goal}
           onChange={(e) => setPayload({ goal: e.target.value })}
-          placeholder="What should the loop accomplish?"
+          placeholder="这个 Loop 要达成什么？可用 {{variable}} 占位。"
         />
       </label>
 
       <label className="field">
-        <span className="field__label">Instructions</span>
+        <span className="field__label">指令 Instructions</span>
         <textarea
           rows={6}
           value={payload.instructions}
           onChange={(e) => setPayload({ instructions: e.target.value })}
-          placeholder="Step-by-step instruction the agent repeats. Use {{variable}} for quick input."
+          placeholder="一步步告诉 AI 怎么做。用 {{variable}} 表示运行时再填的内容。"
         />
       </label>
 
       <div className="row">
         <label className="field">
-          <span className="field__label">Stop condition</span>
+          <span className="field__label">停止条件</span>
           <input
             value={payload.stopCondition ?? ""}
             onChange={(e) => setPayload({ stopCondition: e.target.value })}
-            placeholder="e.g. all tests pass"
+            placeholder="例如：所有测试通过"
           />
         </label>
         <label className="field field--narrow">
-          <span className="field__label">Max iterations</span>
+          <span className="field__label">最大迭代</span>
           <input
             type="number"
             value={payload.maxIterations ?? 10}
@@ -165,12 +165,12 @@ export default function LoopEditor({
       </div>
 
       <fieldset className="fieldset">
-        <legend>Slash command</legend>
-        <p className="muted">Loops are invoked with the "/" slash command.</p>
+        <legend>斜杠命令</legend>
+        <p className="muted">在命令栏输入 <code>/</code> 加关键词即可唤起此 Loop。</p>
         <div className="row trigger-row">
           <span className="trigger-fixed">/</span>
           <input
-            placeholder="keyword (e.g. fixtests)"
+            placeholder="关键词（例如 fixtests）"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
@@ -178,7 +178,7 @@ export default function LoopEditor({
       </fieldset>
 
       <fieldset className="fieldset">
-        <legend>Applies to (scope)</legend>
+        <legend>适用应用</legend>
         <div className="chips">
           <label className="chip">
             <input
@@ -186,7 +186,7 @@ export default function LoopEditor({
               checked={d.scope.appliesTo.includes("all")}
               onChange={() => toggleScope("all")}
             />
-            All apps
+            全部应用
           </label>
           {TARGET_APPS.map((app) => (
             <label key={app.id} className="chip">

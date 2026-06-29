@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Visibility } from "../types/asset";
 import {
@@ -40,26 +40,31 @@ export default function SettingsView({
 }) {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     void getAppInfo().then(setInfo);
   }, []);
 
   // Persist a patched settings object and lift it to the parent.
-  const update = async (patch: Partial<AppSettings>) => {
+  // Debounces the SQLite write to avoid hammering the DB on every keystroke.
+  const update = useCallback((patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch };
     onChange(next);
-    await saveSettings(next);
-  };
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => void saveSettings(next), 300);
+  }, [settings, onChange]);
 
-  const pickAccent = async (id: string) => {
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
+
+  const pickAccent = (id: string) => {
     applyAccent(id);
-    await update({ accent: id });
+    update({ accent: id });
   };
 
   const pickHotkey = async (combo: HotkeyCombo) => {
     await setHotkey(combo);
-    await update({ hotkey: combo });
+    update({ hotkey: combo });
   };
 
   const doClear = async () => {

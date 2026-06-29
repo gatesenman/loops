@@ -9,6 +9,7 @@ import LoopEditor from "../components/LoopEditor";
 import LoopWizard from "../components/LoopWizard";
 import LoopDetail from "../components/LoopDetail";
 import SettingsView from "../components/SettingsView";
+import ToastContainer, { showToast } from "../components/Toast";
 import {
   IconCompass,
   IconLayers,
@@ -77,12 +78,14 @@ export default function LibraryApp() {
     await saveAsset(draft);
     await refresh();
     setMode({ name: "list" });
+    showToast(draft.id ? "Loop 已更新" : "Loop 已保存");
   };
 
   const onDelete = async (id: string) => {
     await deleteAsset(id);
     await refresh();
     setMode({ name: "list" });
+    showToast("已删除", "info");
   };
 
   // Flip a loop's visibility between private and public (quick publish toggle).
@@ -91,6 +94,7 @@ export default function LibraryApp() {
       asset.visibility === "public" ? "private" : "public";
     await saveAsset({ ...asset, visibility });
     await refresh();
+    showToast(visibility === "public" ? "已发布" : "已设为私有");
   };
 
   // Clone an existing loop into a new local draft and persist it.
@@ -112,6 +116,7 @@ export default function LibraryApp() {
     };
     await saveAsset(draft);
     await refresh();
+    showToast("已复制");
   };
 
   // Import a platform loop into the local library, then jump to it.
@@ -119,6 +124,7 @@ export default function LibraryApp() {
     await saveAsset(discoverToDraft(asset));
     await refresh();
     setTab("library");
+    showToast("已导入到我的库");
   };
 
   // Start a brand-new draft honoring the configured default visibility.
@@ -132,7 +138,7 @@ export default function LibraryApp() {
     [loops],
   );
 
-  const filtered = loops.filter((l) => {
+  const filtered = useMemo(() => loops.filter((l) => {
     if (visFilter !== "all" && l.visibility !== visFilter) return false;
     const q = query.toLowerCase();
     if (!q) return true;
@@ -141,9 +147,9 @@ export default function LibraryApp() {
       (l.description ?? "").toLowerCase().includes(q) ||
       l.tags.some((t) => t.toLowerCase().includes(q))
     );
-  });
+  }), [loops, query, visFilter]);
 
-  const discoverFiltered = DISCOVER_LOOPS.filter((l) => {
+  const discoverFiltered = useMemo(() => DISCOVER_LOOPS.filter((l) => {
     const q = query.toLowerCase();
     if (!q) return true;
     return (
@@ -151,7 +157,7 @@ export default function LibraryApp() {
       (l.description ?? "").toLowerCase().includes(q) ||
       l.tags.some((t) => t.toLowerCase().includes(q))
     );
-  });
+  }), [query]);
 
   const goList = (t?: Tab) => {
     if (t) setTab(t);
@@ -201,7 +207,15 @@ export default function LibraryApp() {
         </div>
 
         {loading ? (
-          <p className="muted">Loading…</p>
+          <div className="grid">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card skeleton-card">
+                <div className="skeleton skeleton--line" style={{ width: "60%" }} />
+                <div className="skeleton skeleton--line" />
+                <div className="skeleton skeleton--line" style={{ width: "40%" }} />
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="empty">
             <p>{loops.length === 0 ? "还没有 Loop。" : "没有匹配的 Loop。"}</p>
@@ -324,7 +338,9 @@ export default function LibraryApp() {
           <IconPlus /> 新建 Loop
         </button>
         <div className="sidebar__hint">
-          <kbd>Alt</kbd>+<kbd>Space</kbd> 唤起命令栏
+          {settings.hotkey.split("+").map((k, i) => (
+            <span key={k}>{i > 0 && "+"}<kbd>{k}</kbd></span>
+          ))}{" "}唤起命令栏
         </div>
       </aside>
 
@@ -365,6 +381,7 @@ export default function LibraryApp() {
           <span className="statusbar__muted">本地存储 · SQLite</span>
         </footer>
       </main>
+      <ToastContainer />
     </div>
   );
 }

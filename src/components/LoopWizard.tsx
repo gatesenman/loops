@@ -16,6 +16,7 @@ import {
   type AiSettings,
   type GeneratedLoop,
 } from "../lib/settings";
+import { showToast } from "./Toast";
 
 const STEPS = ["选择模板", "填写内容", "触发与范围", "校验与测试"];
 
@@ -97,6 +98,7 @@ export default function LoopWizard({
     try {
       const gen = await generateLoop(aiPrompt, aiSettings);
       applyGenerated(gen);
+      showToast("AI 生成完成，请微调内容");
     } catch (e) {
       setAiError(String(e));
     } finally {
@@ -226,7 +228,7 @@ export default function LoopWizard({
                   disabled={!aiPrompt.trim() || aiLoading}
                   onClick={doGenerate}
                 >
-                  {aiLoading ? "生成中..." : "AI 生成"}
+                  {aiLoading ? <><span className="spinner" />生成中...</> : "AI 生成"}
                 </button>
                 {aiError && (
                   <div className="ai-gen__error">{aiError}</div>
