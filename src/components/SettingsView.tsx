@@ -1,0 +1,207 @@
+import { useEffect, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import type { Visibility } from "../types/asset";
+import {
+  ACCENTS,
+  applyAccent,
+  clearAssets,
+  getAppInfo,
+  HOTKEYS,
+  saveSettings,
+  setHotkey,
+  type AppInfo,
+  type AppSettings,
+  type HotkeyCombo,
+} from "../lib/settings";
+import { IconExternal, IconTrash } from "./icons";
+import ConfirmDialog from "./ConfirmDialog";
+
+const REFERENCE_URL = "https://loops.elorm.xyz/";
+
+const VIS_OPTIONS: { id: Visibility; label: string }[] = [
+  { id: "private", label: "私有" },
+  { id: "unlisted", label: "未公开" },
+  { id: "public", label: "公开" },
+];
+
+// The Settings surface: appearance, general, command-bar, and about sections.
+// Every control writes through immediately so changes persist and (where
+// relevant) take effect live.
+export default function SettingsView({
+  settings,
+  onChange,
+  onCleared,
+}: {
+  settings: AppSettings;
+  onChange: (next: AppSettings) => void;
+  onCleared: () => void;
+}) {
+  const [info, setInfo] = useState<AppInfo | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  useEffect(() => {
+    void getAppInfo().then(setInfo);
+  }, []);
+
+  // Persist a patched settings object and lift it to the parent.
+  const update = async (patch: Partial<AppSettings>) => {
+    const next = { ...settings, ...patch };
+    onChange(next);
+    await saveSettings(next);
+  };
+
+  const pickAccent = async (id: string) => {
+    applyAccent(id);
+    await update({ accent: id });
+  };
+
+  const pickHotkey = async (combo: HotkeyCombo) => {
+    await setHotkey(combo);
+    await update({ hotkey: combo });
+  };
+
+  const doClear = async () => {
+    await clearAssets();
+    setConfirmClear(false);
+    onCleared();
+  };
+
+  return (
+    <div className="settings">
+      <section className="settings__group">
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">主题强调色</span>
+            <span className="settings__desc">应用于高亮、选中与主按钮。</span>
+          </div>
+          <div className="settings__swatches">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                className={`swatch ${settings.accent === a.id ? "is-active" : ""}`}
+                style={{ background: a.accent }}
+                title={a.label}
+                aria-label={a.label}
+                onClick={() => pickAccent(a.id)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="settings__group">
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">新建 Loop 默认可见性</span>
+            <span className="settings__desc">
+              新建或导入时的初始可见性，之后仍可单独切换。
+            </span>
+          </div>
+          <div className="segmented">
+            {VIS_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                className={`segmented__item ${
+                  settings.defaultVisibility === o.id ? "is-active" : ""
+                }`}
+                onClick={() => update({ defaultVisibility: o.id })}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">全局唤起热键</span>
+            <span className="settings__desc">在任意应用之上唤起命令栏。</span>
+          </div>
+          <select
+            className="settings__select"
+            value={settings.hotkey}
+            onChange={(e) => pickHotkey(e.target.value as HotkeyCombo)}
+          >
+            {HOTKEYS.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      <section className="settings__group">
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">失焦时自动隐藏命令栏</span>
+            <span className="settings__desc">
+              点击其他应用或按 Esc 时自动收起浮框（输入法式）。
+            </span>
+          </div>
+          <button
+            role="switch"
+            aria-checked={settings.hideOnBlur}
+            className={`toggle ${settings.hideOnBlur ? "is-on" : ""}`}
+            onClick={() => update({ hideOnBlur: !settings.hideOnBlur })}
+          >
+            <span className="toggle__knob" />
+          </button>
+        </div>
+      </section>
+
+      <section className="settings__group">
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">版本</span>
+          </div>
+          <span className="settings__value">{info?.version ?? "—"}</span>
+        </div>
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">数据存储位置</span>
+            <span className="settings__desc settings__path">
+              {info?.dataDir ?? "—"}
+            </span>
+          </div>
+        </div>
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">参考站点</span>
+          </div>
+          <button
+            className="btn btn--ghost settings__link"
+            onClick={() => void openUrl(REFERENCE_URL)}
+          >
+            loops.elorm.xyz <IconExternal />
+          </button>
+        </div>
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">清空本地数据</span>
+            <span className="settings__desc">
+              删除本机所有 Loop，此操作不可撤销。
+            </span>
+          </div>
+          <button
+            className="btn btn--danger settings__danger"
+            onClick={() => setConfirmClear(true)}
+          >
+            <IconTrash /> 清空
+          </button>
+        </div>
+      </section>
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="清空本地所有 Loop？"
+          message="本机保存的全部 Loop 将被永久删除，无法恢复。"
+          confirmLabel="清空"
+          danger
+          onConfirm={doClear}
+          onCancel={() => setConfirmClear(false)}
+        />
+      )}
+    </div>
+  );
+}
