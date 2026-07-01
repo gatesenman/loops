@@ -18,6 +18,21 @@ pub fn capture_foreground() {
     win::capture_foreground();
 }
 
+/// Simulates Ctrl+V to paste clipboard content into the previously focused app.
+/// Returns `true` if the keystrokes were delivered to a restored foreground
+/// window, `false` if there was no captured target or the OS refused (in which
+/// case the caller should fall back to "copied, paste manually").
+pub fn simulate_paste() -> bool {
+    #[cfg(windows)]
+    {
+        win::simulate_paste()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 /// Returns the AI app that was in the foreground when the command bar was
 /// summoned, if its process maps to a known target. `None` means
 /// "unknown — don't apply per-app filtering".
@@ -98,6 +113,80 @@ mod win {
         let lower = path.to_lowercase().replace('/', "\\");
         let stem = lower.rsplit('\\').next().unwrap_or(&lower);
         super::map_exe(stem).map(super::target_for_id)
+    }
+
+    pub fn simulate_paste() -> bool {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+            VIRTUAL_KEY,
+        };
+        unsafe {
+            // Restore focus to the previously captured foreground window. Without
+            // a captured target we can't know where the paste would land, so bail
+            // and let the caller fall back to clipboard-only.
+            let raw = LAST_FG.load(Ordering::SeqCst);
+            if raw == 0 {
+                return false;
+            }
+            let hwnd = HWND(raw as *mut core::ffi::c_void);
+            use windows::Win32::UI::WindowsAndMessaging::{
+                IsWindow, SetForegroundWindow,
+            };
+            // The captured window may have closed while the bar was open.
+            if !IsWindow(hwnd).as_bool() {
+                return false;
+            }
+            let focused = SetForegroundWindow(hwnd).as_bool();
+            if !focused {
+                // Couldn't bring the target forward; a paste now would go to the
+                // wrong window. Signal failure instead of pasting blindly.
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(120));
+
+            let vk_ctrl = VIRTUAL_KEY(0x11); // VK_CONTROL
+            let vk_v = VIRTUAL_KEY(0x56);    // VK_V
+
+            let mut inputs: [INPUT; 4] = std::mem::zeroed();
+            // Ctrl down
+            inputs[0].r#type = INPUT_KEYBOARD;
+            inputs[0].Anonymous = INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk_ctrl,
+                    ..std::mem::zeroed()
+                },
+            };
+            // V down
+            inputs[1].r#type = INPUT_KEYBOARD;
+            inputs[1].Anonymous = INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk_v,
+                    ..std::mem::zeroed()
+                },
+            };
+            // V up
+            inputs[2].r#type = INPUT_KEYBOARD;
+            inputs[2].Anonymous = INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk_v,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    ..std::mem::zeroed()
+                },
+            };
+            // Ctrl up
+            inputs[3].r#type = INPUT_KEYBOARD;
+            inputs[3].Anonymous = INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk_ctrl,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    ..std::mem::zeroed()
+                },
+            };
+            let sent = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+            // SendInput returns the number of events inserted; anything less
+            // than the full batch means input was blocked (e.g. UIPI).
+            sent as usize == inputs.len()
+        }
     }
 
     fn process_image_path(hwnd: HWND) -> Option<String> {

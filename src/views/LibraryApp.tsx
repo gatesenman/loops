@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Asset, AssetDraft, Visibility } from "../types/asset";
-import { deleteAsset, listAssets, saveAsset } from "../lib/api";
+import {
+  deleteAsset,
+  exportAssets,
+  importAssets,
+  listAssets,
+  listFavorites,
+  listRecent,
+  saveAsset,
+  setFavorite,
+} from "../lib/api";
 import { emptyLoopDraft, slugify } from "../lib/draft";
 import { DISCOVER_LOOPS, discoverToDraft } from "../lib/discover";
 import LoopCard from "../components/LoopCard";
@@ -53,6 +62,10 @@ export default function LibraryApp() {
   const [visFilter, setVisFilter] = useState<VisFilter>("all");
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  type SortMode = "updated" | "recent" | "favorites";
+  const [sortMode, setSortMode] = useState<SortMode>("updated");
 
   useEffect(() => {
     void getSettings().then((s) => {
@@ -61,14 +74,21 @@ export default function LibraryApp() {
     });
   }, []);
 
+  const refreshMeta = useCallback(async () => {
+    const [favs, recent] = await Promise.all([listFavorites(), listRecent(20)]);
+    setFavIds(new Set(favs));
+    setRecentIds(recent);
+  }, []);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setLoops(await listAssets("loop"));
+      const [assets] = await Promise.all([listAssets("loop"), refreshMeta()]);
+      setLoops(assets);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshMeta]);
 
   useEffect(() => {
     void refresh();
@@ -138,16 +158,33 @@ export default function LibraryApp() {
     [loops],
   );
 
-  const filtered = useMemo(() => loops.filter((l) => {
-    if (visFilter !== "all" && l.visibility !== visFilter) return false;
-    const q = query.toLowerCase();
-    if (!q) return true;
-    return (
-      l.title.toLowerCase().includes(q) ||
-      (l.description ?? "").toLowerCase().includes(q) ||
-      l.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  }), [loops, query, visFilter]);
+  const filtered = useMemo(() => {
+    let result = loops.filter((l) => {
+      if (visFilter !== "all" && l.visibility !== visFilter) return false;
+      const q = query.toLowerCase();
+      if (!q) return true;
+      return (
+        l.title.toLowerCase().includes(q) ||
+        (l.description ?? "").toLowerCase().includes(q) ||
+        l.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+    if (sortMode === "favorites") {
+      result = [...result].sort((a, b) => {
+        const af = favIds.has(a.id) ? 1 : 0;
+        const bf = favIds.has(b.id) ? 1 : 0;
+        return bf - af;
+      });
+    } else if (sortMode === "recent") {
+      const order = new Map(recentIds.map((id, i) => [id, i]));
+      result = [...result].sort((a, b) => {
+        const ai = order.get(a.id) ?? 9999;
+        const bi = order.get(b.id) ?? 9999;
+        return ai - bi;
+      });
+    }
+    return result;
+  }, [loops, query, visFilter, sortMode, favIds, recentIds]);
 
   const discoverFiltered = useMemo(() => DISCOVER_LOOPS.filter((l) => {
     const q = query.toLowerCase();
@@ -187,23 +224,41 @@ export default function LibraryApp() {
         onBack={() => goList()}
         onEdit={(a) => setMode({ name: "edit", draft: a as AssetDraft })}
         onDelete={onDelete}
+        autoPaste={settings.autoPaste}
       />
     );
   } else if (tab === "library") {
     body = (
       <>
-        <div className="segmented">
-          {VIS_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              className={`segmented__item ${
-                visFilter === f.id ? "is-active" : ""
-              }`}
-              onClick={() => setVisFilter(f.id)}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="library__filters">
+          <div className="segmented">
+            {VIS_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                className={`segmented__item ${
+                  visFilter === f.id ? "is-active" : ""
+                }`}
+                onClick={() => setVisFilter(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="segmented segmented--sort">
+            {([
+              ["updated", "最新"],
+              ["recent", "最近使用"],
+              ["favorites", "收藏优先"],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                className={`segmented__item ${sortMode === id ? "is-active" : ""}`}
+                onClick={() => setSortMode(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
@@ -232,6 +287,17 @@ export default function LibraryApp() {
                 onOpen={() => setMode({ name: "detail", asset: loop })}
                 onTogglePublish={() => togglePublish(loop)}
                 onDuplicate={() => duplicate(loop)}
+                isFavorite={favIds.has(loop.id)}
+                onToggleFavorite={async () => {
+                  const next = !favIds.has(loop.id);
+                  await setFavorite(loop.id, next);
+                  setFavIds((prev) => {
+                    const s = new Set(prev);
+                    next ? s.add(loop.id) : s.delete(loop.id);
+                    return s;
+                  });
+                  showToast(next ? "已收藏" : "已取消收藏");
+                }}
               />
             ))}
           </div>
@@ -360,6 +426,38 @@ export default function LibraryApp() {
                 />
               </div>
               <div className="toolbar__actions">
+                {tab === "library" && (
+                  <>
+                    <button
+                      className="btn"
+                      onClick={async () => {
+                        try {
+                          const msg = await importAssets();
+                          await refresh();
+                          showToast(msg);
+                        } catch (e) {
+                          if (String(e) !== "cancelled") showToast(String(e), "error");
+                        }
+                      }}
+                    >
+                      导入
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={async () => {
+                        try {
+                          const msg = await exportAssets();
+                          showToast(msg);
+                        } catch (e) {
+                          if (String(e) !== "cancelled") showToast(String(e), "error");
+                        }
+                      }}
+                      disabled={loops.length === 0}
+                    >
+                      导出
+                    </button>
+                  </>
+                )}
                 <button
                   className="btn"
                   onClick={() => setMode({ name: "edit", draft: newDraft() })}

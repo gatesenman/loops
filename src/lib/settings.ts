@@ -29,6 +29,7 @@ export interface AppSettings {
   defaultVisibility: Visibility;
   hotkey: HotkeyCombo;
   hideOnBlur: boolean;
+  autoPaste: boolean;
   ai?: AiSettings;
 }
 
@@ -67,6 +68,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultVisibility: "private",
   hotkey: "Alt+Space",
   hideOnBlur: true,
+  autoPaste: true,
 };
 
 export async function getSettings(): Promise<AppSettings> {

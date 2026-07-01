@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import type { Asset, TargetAppId } from "../types/asset";
-import { bumpCopies, getForegroundApp, injectText, listAssets } from "../lib/api";
+import {
+  bumpCopies,
+  getForegroundApp,
+  injectText,
+  listAssets,
+  listFavorites,
+  listPresets,
+  listRecent,
+  type Preset,
+  recordUsage,
+  setFavorite,
+} from "../lib/api";
 import { appName, TARGET_APPS } from "../lib/apps";
 import { renderLoop } from "../lib/render";
+import { getSettings } from "../lib/settings";
 import VariableForm from "../components/VariableForm";
 
 // The hotkey-summoned command bar. Type to filter loops; a leading trigger
@@ -16,6 +28,10 @@ export default function CommandBar() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [activeApp, setActiveApp] = useState<TargetAppId>("all");
   const [highlight, setHighlight] = useState(0);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [autoPaste, setAutoPaste] = useState(true);
+  const [presets, setPresets] = useState<Preset[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -42,7 +58,16 @@ export default function CommandBar() {
 
   useEffect(() => {
     const load = async () => {
-      setLoops(await listAssets("loop"));
+      const [assets, favs, recent, settings] = await Promise.all([
+        listAssets("loop"),
+        listFavorites(),
+        listRecent(20),
+        getSettings(),
+      ]);
+      setLoops(assets);
+      setFavorites(new Set(favs));
+      setRecentIds(recent);
+      setAutoPaste(settings.autoPaste);
       const fg = await getForegroundApp();
       if (fg) setActiveApp(fg.id as TargetAppId);
     };
@@ -68,6 +93,15 @@ export default function CommandBar() {
     if (!selected) inputRef.current?.focus();
   }, [selected]);
 
+  // Load saved presets for the loop being filled.
+  useEffect(() => {
+    if (selected && selected.variables.length > 0) {
+      void listPresets(selected.id).then(setPresets);
+    } else {
+      setPresets([]);
+    }
+  }, [selected]);
+
   const hide = async () => {
     setQuery("");
     setSelected(null);
@@ -86,7 +120,7 @@ export default function CommandBar() {
       : null;
     const term = (triggerChar ? trimmed.slice(1) : trimmed).toLowerCase();
 
-    return loops.filter(inScope).filter((a) => {
+    const filtered = loops.filter(inScope).filter((a) => {
       if (triggerChar) {
         return a.triggers.some(
           (t) =>
@@ -100,10 +134,36 @@ export default function CommandBar() {
         a.tags.some((t) => t.toLowerCase().includes(term))
       );
     });
+
+    // Rank: favorites first, then most-recently-used, then the rest by title.
+    // When the user is actively typing a term we keep this ordering too so the
+    // top hit is the loop they reach for most, not an arbitrary one.
+    const recentRank = new Map(recentIds.map((id, i) => [id, i]));
+    return filtered.sort((a, b) => {
+      const fa = favorites.has(a.id) ? 0 : 1;
+      const fb = favorites.has(b.id) ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      const ra = recentRank.has(a.id) ? recentRank.get(a.id)! : Infinity;
+      const rb = recentRank.has(b.id) ? recentRank.get(b.id)! : Infinity;
+      if (ra !== rb) return ra - rb;
+      return a.title.localeCompare(b.title);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loops, query, activeApp]);
+  }, [loops, query, activeApp, favorites, recentIds]);
 
   useEffect(() => setHighlight(0), [query]);
+
+  const toggleFav = async (a: Asset, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = !favorites.has(a.id);
+    setFavorites((prev) => {
+      const s = new Set(prev);
+      if (next) s.add(a.id);
+      else s.delete(a.id);
+      return s;
+    });
+    await setFavorite(a.id, next);
+  };
 
   const choose = (a: Asset) => {
     if (a.variables.length > 0) {
@@ -117,10 +177,18 @@ export default function CommandBar() {
   };
 
   const run = async (a: Asset, vals: Record<string, string>) => {
-    await injectText(renderLoop(a, vals));
+    await injectText(renderLoop(a, vals), autoPaste);
     void bumpCopies(a.id);
+    void recordUsage(a.id, vals);
     await hide();
   };
+
+  // Required variables the user hasn't filled for the loop being previewed.
+  const missingRequired = selected
+    ? selected.variables
+        .filter((v) => v.required && !values[v.name]?.trim())
+        .map((v) => v.label || v.name)
+    : [];
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -143,11 +211,31 @@ export default function CommandBar() {
         {selected ? (
           <div className="cmdbar__fill" data-tauri-drag-region>
             <h3>{selected.title}</h3>
+            {presets.length > 0 && (
+              <div className="presets presets--compact">
+                <span className="presets__label">预设：</span>
+                {presets.map((p) => (
+                  <button
+                    key={p.id}
+                    className="btn btn--mini btn--ghost"
+                    onClick={() => setValues(p.values)}
+                    title={`应用预设「${p.name}」`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
             <VariableForm
               variables={selected.variables}
               values={values}
               onChange={setValues}
             />
+            {missingRequired.length > 0 && (
+              <div className="cmdbar__warn">
+                ⚠ 必填：{missingRequired.join("、")}
+              </div>
+            )}
             <div className="row">
               <button
                 className="btn btn--ghost"
@@ -158,8 +246,9 @@ export default function CommandBar() {
               <button
                 className="btn btn--primary"
                 onClick={() => run(selected, values)}
+                disabled={missingRequired.length > 0}
               >
-                运行 → 注入
+                {autoPaste ? "运行 → 自动粘贴" : "运行 → 复制"}
               </button>
             </div>
           </div>
@@ -194,29 +283,47 @@ export default function CommandBar() {
               {results.length === 0 ? (
                 <li className="cmdbar__empty">没有匹配的 Loop</li>
               ) : (
-                results.map((a, i) => (
-                  <li
-                    key={a.id}
-                    className={`cmdbar__item ${
-                      i === highlight ? "is-active" : ""
-                    }`}
-                    onMouseEnter={() => setHighlight(i)}
-                    onClick={() => choose(a)}
-                  >
-                    <div className="cmdbar__item-main">
-                      <span className="cmdbar__item-title">{a.title}</span>
-                      {a.triggers[0] && (
-                        <span className="badge">
-                          {a.triggers[0].trigger}
-                          {a.triggers[0].keyword}
-                        </span>
-                      )}
-                    </div>
-                    {a.description && (
-                      <span className="cmdbar__item-desc">{a.description}</span>
-                    )}
-                  </li>
-                ))
+                results.map((a, i) => {
+                  const isFav = favorites.has(a.id);
+                  const isRecent = recentIds.includes(a.id);
+                  return (
+                    <li
+                      key={a.id}
+                      className={`cmdbar__item ${
+                        i === highlight ? "is-active" : ""
+                      }`}
+                      onMouseEnter={() => setHighlight(i)}
+                      onClick={() => choose(a)}
+                    >
+                      <button
+                        className={`cmdbar__fav ${isFav ? "is-fav" : ""}`}
+                        onClick={(e) => toggleFav(a, e)}
+                        title={isFav ? "取消收藏" : "收藏"}
+                      >
+                        {isFav ? "★" : "☆"}
+                      </button>
+                      <div className="cmdbar__item-body">
+                        <div className="cmdbar__item-main">
+                          <span className="cmdbar__item-title">{a.title}</span>
+                          {isRecent && !isFav && (
+                            <span className="cmdbar__recent">最近</span>
+                          )}
+                          {a.triggers[0] && (
+                            <span className="badge">
+                              {a.triggers[0].trigger}
+                              {a.triggers[0].keyword}
+                            </span>
+                          )}
+                        </div>
+                        {a.description && (
+                          <span className="cmdbar__item-desc">
+                            {a.description}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })
               )}
             </ul>
           </>

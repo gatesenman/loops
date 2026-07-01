@@ -12,6 +12,19 @@ export function fillTemplate(
   });
 }
 
+// Returns the placeholder names still present in a rendered string, i.e. the
+// {{var}} tokens that were left intact because their value was empty/unknown.
+// Used by the detail view to warn before a "dry run" / injection.
+export function unfilledPlaceholders(text: string): string[] {
+  const found = new Set<string>();
+  const re = /\{\{\s*([\w.-]+)\s*\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    found.add(m[1]);
+  }
+  return [...found];
+}
+
 // Renders a Loop asset into the text injected into the target AI app. This is
 // the canonical "what the agent receives" string for a loop run.
 export function renderLoop(

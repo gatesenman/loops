@@ -82,6 +82,14 @@ pub fn set_hotkey(app: AppHandle, combo: String) -> Result<(), String> {
     crate::apply_hotkey(&app, &combo)
 }
 
+/// Simulates Ctrl+V in the previously captured foreground window. Returns
+/// whether the paste actually reached a restored target window; `false` tells
+/// the frontend to fall back to a "copied, paste manually" message.
+#[tauri::command]
+pub fn simulate_paste() -> Result<bool, String> {
+    Ok(osbridge::simulate_paste())
+}
+
 /// Wipes every locally stored Loop (used by the "clear local data" setting).
 #[tauri::command]
 pub fn clear_assets(store: State<Store>) -> Result<(), String> {
@@ -106,6 +114,170 @@ pub fn app_info(app: AppHandle) -> Result<AppInfo, String> {
         version: app.package_info().version.to_string(),
         data_dir: dir.to_string_lossy().to_string(),
     })
+}
+
+// ---------------------------------------------------------------------------
+// History & Favorites
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn record_usage(
+    store: State<Store>,
+    asset_id: String,
+    variables: String,
+) -> Result<(), String> {
+    store.record_usage(&asset_id, &variables)
+}
+
+#[tauri::command]
+pub fn list_recent(store: State<Store>, limit: usize) -> Result<Vec<String>, String> {
+    store.list_recent_asset_ids(limit)
+}
+
+#[tauri::command]
+pub fn get_use_count(store: State<Store>, asset_id: String) -> Result<i64, String> {
+    store.get_asset_use_count(&asset_id)
+}
+
+#[tauri::command]
+pub fn get_last_used(store: State<Store>, asset_id: String) -> Result<Option<String>, String> {
+    store.get_last_used(&asset_id)
+}
+
+#[tauri::command]
+pub fn set_favorite(store: State<Store>, asset_id: String, fav: bool) -> Result<(), String> {
+    store.set_favorite(&asset_id, fav)
+}
+
+#[tauri::command]
+pub fn list_favorites(store: State<Store>) -> Result<Vec<String>, String> {
+    store.list_favorites()
+}
+
+// ---------------------------------------------------------------------------
+// Variable Presets
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize)]
+pub struct Preset {
+    pub id: String,
+    pub name: String,
+    pub values: serde_json::Value,
+}
+
+#[tauri::command]
+pub fn list_presets(store: State<Store>, asset_id: String) -> Result<Vec<Preset>, String> {
+    let rows = store.list_presets(&asset_id)?;
+    rows.into_iter()
+        .map(|(id, name, json)| {
+            let values: serde_json::Value =
+                serde_json::from_str(&json).unwrap_or(serde_json::Value::Object(Default::default()));
+            Ok(Preset { id, name, values })
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn save_preset(
+    store: State<Store>,
+    asset_id: String,
+    name: String,
+    values: serde_json::Value,
+) -> Result<Preset, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let json = serde_json::to_string(&values).map_err(|e| e.to_string())?;
+    store.save_preset(&id, &asset_id, &name, &json)?;
+    Ok(Preset { id, name, values })
+}
+
+#[tauri::command]
+pub fn delete_preset(store: State<Store>, id: String) -> Result<(), String> {
+    store.delete_preset(&id)
+}
+
+// ---------------------------------------------------------------------------
+// Export / Import
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize)]
+struct ExportEnvelope {
+    version: u32,
+    #[serde(rename = "exportedAt")]
+    exported_at: String,
+    loops: Vec<Asset>,
+}
+
+/// Exports the given asset IDs (or all if empty) as a JSON file.
+/// Opens a native save-file dialog and writes to the chosen path.
+#[tauri::command]
+pub async fn export_assets(store: State<'_, Store>, ids: Vec<String>) -> Result<String, String> {
+    let assets = if ids.is_empty() {
+        store.list(Some("loop"))?
+    } else {
+        let mut out = Vec::new();
+        for id in &ids {
+            if let Some(a) = store.get(id)? {
+                out.push(a);
+            }
+        }
+        out
+    };
+    if assets.is_empty() {
+        return Err("没有可导出的 Loop".to_string());
+    }
+    let count = assets.len();
+    let envelope = ExportEnvelope {
+        version: 1,
+        exported_at: now_iso(),
+        loops: assets,
+    };
+    let json = serde_json::to_string_pretty(&envelope).map_err(|e| e.to_string())?;
+
+    let handle = rfd::AsyncFileDialog::new()
+        .set_title("导出 Loop")
+        .add_filter("Loops JSON", &["loops.json", "json"])
+        .set_file_name("my-loops.loops.json")
+        .save_file()
+        .await;
+    match handle {
+        Some(file) => {
+            let path = file.path();
+            std::fs::write(path, &json).map_err(|e| e.to_string())?;
+            Ok(format!("已导出 {} 个 Loop", count))
+        }
+        None => Err("cancelled".to_string()),
+    }
+}
+
+/// Opens a native file dialog, reads a .loops.json file, and imports the
+/// contained loops into the local library.
+#[tauri::command]
+pub async fn import_assets(store: State<'_, Store>) -> Result<String, String> {
+    let handle = rfd::AsyncFileDialog::new()
+        .set_title("导入 Loop")
+        .add_filter("Loops JSON", &["loops.json", "json"])
+        .pick_file()
+        .await;
+    let file = match handle {
+        Some(f) => f,
+        None => return Err("cancelled".to_string()),
+    };
+    let bytes = file.read().await;
+    let text = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+    let envelope: ExportEnvelope =
+        serde_json::from_str(&text).map_err(|e| format!("文件格式错误: {e}"))?;
+    let mut imported = 0;
+    for mut asset in envelope.loops {
+        // Assign a new id to avoid collisions with existing assets.
+        asset.id = uuid::Uuid::new_v4().to_string();
+        let now = now_iso();
+        asset.created_at = now.clone();
+        asset.updated_at = now;
+        asset.origin = "local".to_string();
+        store.upsert(&asset)?;
+        imported += 1;
+    }
+    Ok(format!("已导入 {} 个 Loop", imported))
 }
 
 // ---------------------------------------------------------------------------

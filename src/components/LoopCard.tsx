@@ -8,11 +8,17 @@ export default function LoopCard({
   onOpen,
   onTogglePublish,
   onDuplicate,
+  isFavorite,
+  onToggleFavorite,
+  lastUsedLabel,
 }: {
   asset: Asset;
   onOpen: () => void;
   onTogglePublish?: () => void;
   onDuplicate?: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
+  lastUsedLabel?: string;
 }) {
   const isPublic = asset.visibility === "public";
   return (
@@ -40,8 +46,20 @@ export default function LoopCard({
       </div>
       {(onTogglePublish || onDuplicate) && (
         <div className="card__actions">
+          {onToggleFavorite && (
+            <button
+              className={`btn btn--mini btn--ghost card__fav${isFavorite ? " is-fav" : ""}`}
+              onClick={onToggleFavorite}
+              title={isFavorite ? "取消收藏" : "收藏"}
+            >
+              {isFavorite ? "★" : "☆"}
+            </button>
+          )}
           {asset.stats.copies > 0 && (
             <span className="card__stat">↻ {asset.stats.copies}</span>
+          )}
+          {lastUsedLabel && (
+            <span className="card__stat">{lastUsedLabel}</span>
           )}
           <span className="card__spacer" />
           {onDuplicate && (

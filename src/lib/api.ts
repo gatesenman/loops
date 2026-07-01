@@ -33,8 +33,86 @@ export function toggleCommandBar(): Promise<void> {
   return invoke<void>("toggle_command_bar");
 }
 
-// Injection (M1): copy rendered text to the clipboard. M2 adds keystroke
-// injection into the foreground app via the OS bridge.
-export async function injectText(text: string): Promise<void> {
+// Returns whether the paste actually reached the target window.
+export function simulatePaste(): Promise<boolean> {
+  return invoke<boolean>("simulate_paste");
+}
+
+export interface InjectResult {
+  // Whether text was auto-pasted into the target app (vs. clipboard-only).
+  pasted: boolean;
+}
+
+// Injection: copy rendered text to the clipboard, optionally auto-paste. When
+// auto-paste is requested but the target window can't be restored, this still
+// succeeds (text is on the clipboard) but reports pasted=false so the caller
+// can prompt the user to paste manually.
+export async function injectText(
+  text: string,
+  autoPaste = false,
+): Promise<InjectResult> {
   await writeText(text);
+  if (autoPaste) {
+    try {
+      const pasted = await simulatePaste();
+      return { pasted };
+    } catch {
+      return { pasted: false };
+    }
+  }
+  return { pasted: false };
+}
+
+export function recordUsage(assetId: string, variables: Record<string, string> = {}): Promise<void> {
+  return invoke<void>("record_usage", { assetId, variables: JSON.stringify(variables) });
+}
+
+export function listRecent(limit = 10): Promise<string[]> {
+  return invoke<string[]>("list_recent", { limit });
+}
+
+export function getUseCount(assetId: string): Promise<number> {
+  return invoke<number>("get_use_count", { assetId });
+}
+
+export function getLastUsed(assetId: string): Promise<string | null> {
+  return invoke<string | null>("get_last_used", { assetId });
+}
+
+export function setFavorite(assetId: string, fav: boolean): Promise<void> {
+  return invoke<void>("set_favorite", { assetId, fav });
+}
+
+export function listFavorites(): Promise<string[]> {
+  return invoke<string[]>("list_favorites");
+}
+
+export interface Preset {
+  id: string;
+  name: string;
+  values: Record<string, string>;
+}
+
+export function listPresets(assetId: string): Promise<Preset[]> {
+  return invoke<Preset[]>("list_presets", { assetId });
+}
+
+export function savePreset(
+  assetId: string,
+  name: string,
+  values: Record<string, string>,
+): Promise<Preset> {
+  return invoke<Preset>("save_preset", { assetId, name, values });
+}
+
+export function deletePreset(id: string): Promise<void> {
+  return invoke<void>("delete_preset", { id });
+}
+
+export function exportAssets(ids: string[] = []): Promise<string> {
+  return invoke<string>("export_assets", { ids });
+}
+
+export function importAssets(): Promise<string> {
+  return invoke<string>("import_assets");
 }

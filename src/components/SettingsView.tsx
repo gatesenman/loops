@@ -136,6 +136,23 @@ export default function SettingsView({
             ))}
           </select>
         </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">自动粘贴</span>
+            <span className="settings__desc">
+              注入 Loop 后自动模拟 Ctrl+V 粘贴到目标应用（关闭则仅复制到剪贴板）。
+            </span>
+          </div>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={settings.autoPaste}
+              onChange={(e) => update({ autoPaste: e.target.checked })}
+            />
+            <span className="toggle__track" />
+          </label>
+        </div>
       </section>
 
       <section className="settings__group">

@@ -1,8 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Asset, LoopPayload } from "../types/asset";
 import { appName } from "../lib/apps";
-import { renderLoop } from "../lib/render";
-import { bumpCopies, injectText } from "../lib/api";
+import { renderLoop, unfilledPlaceholders } from "../lib/render";
+import {
+  bumpCopies,
+  deletePreset,
+  injectText,
+  listPresets,
+  type Preset,
+  recordUsage,
+  savePreset,
+} from "../lib/api";
 import VariableForm from "./VariableForm";
 import ConfirmDialog from "./ConfirmDialog";
 import { showToast } from "./Toast";
@@ -14,11 +22,13 @@ export default function LoopDetail({
   onBack,
   onEdit,
   onDelete,
+  autoPaste,
 }: {
   asset: Asset;
   onBack: () => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
+  autoPaste?: boolean;
 }) {
   const payload = asset.payload as LoopPayload;
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -28,14 +38,36 @@ export default function LoopDetail({
   );
   const [copied, setCopied] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
+
+  useEffect(() => {
+    if (asset.variables.length > 0) {
+      void listPresets(asset.id).then(setPresets);
+    }
+  }, [asset.id, asset.variables.length]);
 
   const rendered = renderLoop(asset, values);
 
+  // Dry-run checks: required variables left blank, and any {{placeholder}} the
+  // template still contains after substitution (a signal the run will inject an
+  // incomplete prompt).
+  const missingRequired = asset.variables
+    .filter((v) => v.required && !values[v.name]?.trim())
+    .map((v) => v.label || v.name);
+  const unfilled = unfilledPlaceholders(rendered);
+
   const onRun = async () => {
-    await injectText(rendered);
+    const { pasted } = await injectText(rendered, autoPaste);
     void bumpCopies(asset.id);
+    void recordUsage(asset.id, values);
     setCopied(true);
-    showToast("已复制到剪贴板");
+    if (autoPaste && !pasted) {
+      showToast("已复制到剪贴板（未能自动粘贴，请手动 Ctrl+V）", "info");
+    } else {
+      showToast(pasted ? "已粘贴到目标应用" : "已复制到剪贴板");
+    }
     setTimeout(() => setCopied(false), 1800);
   };
 
@@ -96,22 +128,115 @@ export default function LoopDetail({
       {asset.variables.length > 0 && (
         <section>
           <h3>变量</h3>
+          {presets.length > 0 && (
+            <div className="presets">
+              <span className="presets__label">预设：</span>
+              {presets.map((p) => (
+                <span key={p.id} className="preset-chip">
+                  <button
+                    className="btn btn--mini btn--ghost"
+                    onClick={() => setValues(p.values)}
+                    title={`应用预设「${p.name}」`}
+                  >
+                    {p.name}
+                  </button>
+                  <button
+                    className="preset-chip__del"
+                    onClick={async () => {
+                      await deletePreset(p.id);
+                      setPresets((prev) => prev.filter((x) => x.id !== p.id));
+                      showToast("已删除预设");
+                    }}
+                    title="删除此预设"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <VariableForm
             variables={asset.variables}
             values={values}
             onChange={setValues}
           />
+          <div className="presets__save">
+            {savingPreset ? (
+              <div className="presets__input-row">
+                <input
+                  className="input"
+                  placeholder="预设名称"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setSavingPreset(false);
+                  }}
+                />
+                <button
+                  className="btn btn--mini"
+                  disabled={!presetName.trim()}
+                  onClick={async () => {
+                    const p = await savePreset(asset.id, presetName.trim(), values);
+                    setPresets((prev) => [...prev, p]);
+                    setSavingPreset(false);
+                    setPresetName("");
+                    showToast("预设已保存");
+                  }}
+                >
+                  保存
+                </button>
+                <button
+                  className="btn btn--mini btn--ghost"
+                  onClick={() => setSavingPreset(false)}
+                >
+                  取消
+                </button>
+              </div>
+            ) : (
+              <button
+                className="btn btn--mini btn--ghost"
+                onClick={() => setSavingPreset(true)}
+              >
+                + 保存当前为预设
+              </button>
+            )}
+          </div>
         </section>
       )}
 
       <section>
         <h3>预览</h3>
+        {(missingRequired.length > 0 || unfilled.length > 0) && (
+          <div className="dryrun-warn">
+            {missingRequired.length > 0 && (
+              <div>⚠ 必填变量未填写：{missingRequired.join("、")}</div>
+            )}
+            {unfilled.length > 0 && (
+              <div>
+                🔶 预览中仍有未替换的占位符：
+                {unfilled.map((n) => `{{${n}}}`).join(" ")}
+              </div>
+            )}
+          </div>
+        )}
         <pre className="block block--preview">{rendered}</pre>
       </section>
 
       <div className="detail__actions">
-        <button className="btn btn--primary" onClick={onRun}>
-          {copied ? "已复制到剪贴板 ✓" : "运行 → 复制到剪贴板"}
+        <button
+          className="btn btn--primary"
+          onClick={onRun}
+          disabled={missingRequired.length > 0}
+          title={
+            missingRequired.length > 0
+              ? "请先填写必填变量"
+              : undefined
+          }
+        >
+          {copied
+            ? (autoPaste ? "已粘贴 ✓" : "已复制到剪贴板 ✓")
+            : (autoPaste ? "运行 → 自动粘贴" : "运行 → 复制到剪贴板")}
         </button>
       </div>
 
