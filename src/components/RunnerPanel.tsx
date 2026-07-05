@@ -4,6 +4,7 @@ import type { Asset, LoopPayload } from "../types/asset";
 import { chatComplete, type ChatMessage } from "../lib/api";
 import { getSettings, type AiSettings } from "../lib/settings";
 import { showToast } from "./Toast";
+import Markdown from "./Markdown";
 
 // In-app Loop runner: executes the rendered loop against the configured AI
 // provider, iterating (user-driven) until the stop condition is met or
@@ -125,7 +126,13 @@ export default function RunnerPanel({
               <div className="runner__role">
                 {m.role === "user" ? "输入" : `AI 第 ${messages.slice(0, i).filter((x) => x.role === "assistant").length + 1} 轮`}
               </div>
-              <pre className="runner__content">{m.content}</pre>
+              {m.role === "assistant" ? (
+                <div className="runner__content">
+                  <Markdown>{m.content.replace(DONE_MARK, "").trim()}</Markdown>
+                </div>
+              ) : (
+                <pre className="runner__content">{m.content}</pre>
+              )}
               {m.role === "assistant" && (
                 <button
                   className="btn btn--mini btn--ghost"

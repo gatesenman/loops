@@ -14,6 +14,7 @@ import {
 import VariableForm from "./VariableForm";
 import RunnerPanel from "./RunnerPanel";
 import LintPanel from "./LintPanel";
+import Markdown from "./Markdown";
 import { lintLoop } from "../lib/validate";
 import ConfirmDialog from "./ConfirmDialog";
 import { showToast } from "./Toast";
@@ -257,7 +258,9 @@ export default function LoopDetail({
             )}
           </div>
         )}
-        <pre className="block block--preview">{rendered}</pre>
+        <div className="block block--preview">
+          <Markdown>{rendered}</Markdown>
+        </div>
       </section>
 
       <div className="detail__actions">
