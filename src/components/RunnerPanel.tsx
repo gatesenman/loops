@@ -18,6 +18,8 @@ function buildSystem(asset: Asset): string {
     `目标：${p.goal || asset.title}`,
   ];
   if (p.stopCondition) parts.push(`停止条件：${p.stopCondition}`);
+  if (p.constraints) parts.push(`约束（禁止事项）：${p.constraints}`);
+  if (p.outputFormat) parts.push(`输出格式要求：${p.outputFormat}`);
   parts.push(
     `请严格按用户提供的指令执行。每轮给出当前最佳结果；` +
       `当你判断停止条件已满足、无需继续迭代时，在回复的第一行输出 ${DONE_MARK}。`,
@@ -59,7 +61,11 @@ export default function RunnerPanel({
     setError("");
     setMessages(next);
     try {
-      const reply = await chatComplete(buildSystem(asset), next, ai);
+      // A per-loop model override takes precedence over the global setting.
+      const reply = await chatComplete(buildSystem(asset), next, {
+        ...ai,
+        model: payload.model || ai.model,
+      });
       const finished = reply.trimStart().startsWith(DONE_MARK);
       setMessages([...next, { role: "assistant", content: reply }]);
       if (finished) {
