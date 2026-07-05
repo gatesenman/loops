@@ -216,7 +216,12 @@ export default function LibraryApp() {
     );
   } else if (mode.name === "edit") {
     body = (
-      <LoopEditor draft={mode.draft} onCancel={() => goList()} onSave={onSave} />
+      <LoopEditor
+        draft={mode.draft}
+        existing={loops}
+        onCancel={() => goList()}
+        onSave={onSave}
+      />
     );
   } else if (mode.name === "detail") {
     body = (

@@ -13,6 +13,8 @@ import {
 } from "../lib/api";
 import VariableForm from "./VariableForm";
 import RunnerPanel from "./RunnerPanel";
+import LintPanel from "./LintPanel";
+import { lintLoop } from "../lib/validate";
 import ConfirmDialog from "./ConfirmDialog";
 import { showToast } from "./Toast";
 
@@ -59,6 +61,7 @@ export default function LoopDetail({
     .filter((v) => v.required && !values[v.name]?.trim())
     .map((v) => v.label || v.name);
   const unfilled = unfilledPlaceholders(rendered);
+  const lint = lintLoop(asset);
 
   const onRun = async () => {
     const { pasted } = await injectText(rendered, autoPaste);
@@ -206,6 +209,11 @@ export default function LoopDetail({
           </div>
         </section>
       )}
+
+      <section>
+        <h3>规范检查</h3>
+        <LintPanel report={lint} />
+      </section>
 
       <section>
         <h3>预览</h3>
