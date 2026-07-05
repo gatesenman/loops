@@ -11,7 +11,15 @@ export interface ValidationResult {
 // fields, de-duplicated and in first-seen order.
 export function extractVariables(d: AssetDraft): string[] {
   const p = d.payload as LoopPayload;
-  const text = [p.goal, p.instructions, p.stopCondition ?? ""].join("\n");
+  const text = [
+    p.goal,
+    p.instructions,
+    p.stopCondition ?? "",
+    p.context ?? "",
+    p.constraints ?? "",
+    p.outputFormat ?? "",
+    p.examples ?? "",
+  ].join("\n");
   const seen: string[] = [];
   const re = /\{\{\s*([\w.-]+)\s*\}\}/g;
   let m: RegExpExecArray | null;
@@ -136,6 +144,10 @@ export function lintLoop(d: AssetDraft, existing: Asset[] = []): LintReport {
   if (!(p.stopCondition ?? "").trim())
     add("停止条件", "warn", "未设置停止条件，迭代式 Loop 建议明确何时结束。");
   else add("停止条件", "pass", "已填写。");
+
+  if (!(p.outputFormat ?? "").trim())
+    add("输出格式", "warn", "未约定输出格式（markdown/JSON/纯代码等），AI 输出不稳定。");
+  else add("输出格式", "pass", "已约定。");
 
   if (
     p.maxIterations === undefined ||

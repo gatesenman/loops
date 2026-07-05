@@ -122,11 +122,38 @@ export default function LoopDetail({
         <p>{payload.goal || <span className="muted">—</span>}</p>
         <h3>指令</h3>
         <pre className="block">{payload.instructions || "—"}</pre>
+        {payload.context && (
+          <>
+            <h3>前置上下文</h3>
+            <p>{payload.context}</p>
+          </>
+        )}
+        {payload.constraints && (
+          <>
+            <h3>约束 / 禁止事项</h3>
+            <pre className="block">{payload.constraints}</pre>
+          </>
+        )}
+        {payload.outputFormat && (
+          <>
+            <h3>输出格式</h3>
+            <p>{payload.outputFormat}</p>
+          </>
+        )}
+        {payload.examples && (
+          <>
+            <h3>示例</h3>
+            <pre className="block">{payload.examples}</pre>
+          </>
+        )}
         {payload.stopCondition && (
           <>
             <h3>停止条件</h3>
             <p>{payload.stopCondition}</p>
           </>
+        )}
+        {payload.model && (
+          <p className="muted">模型覆写：{payload.model}</p>
         )}
       </section>
 

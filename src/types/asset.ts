@@ -72,7 +72,16 @@ export interface LoopPayload {
   instructions: string;
   stopCondition?: string;
   maxIterations?: number;
+  // Preferred model for this loop (overrides the global AI setting in 试跑).
   model?: string;
+  // Required output shape, e.g. "markdown 列表" / "纯 JSON" / "只输出代码".
+  outputFormat?: string;
+  // Guardrails: what the AI must NOT do.
+  constraints?: string;
+  // What context the runner should provide (selected code, diff, logs…).
+  context?: string;
+  // Few-shot input/output examples.
+  examples?: string;
 }
 
 // Placeholder payloads for future categories — typed now so the union is

@@ -208,6 +208,53 @@ export default function LoopEditor({
       </div>
 
       <fieldset className="fieldset">
+        <legend>高级 Prompt 工程</legend>
+        <label className="field">
+          <span className="field__label">输出格式</span>
+          <input
+            value={payload.outputFormat ?? ""}
+            onChange={(e) => setPayload({ outputFormat: e.target.value })}
+            placeholder="例如：markdown 列表 / 纯 JSON / 只输出代码，不要解释"
+          />
+        </label>
+        <label className="field">
+          <span className="field__label">约束 / 禁止事项</span>
+          <textarea
+            rows={2}
+            value={payload.constraints ?? ""}
+            onChange={(e) => setPayload({ constraints: e.target.value })}
+            placeholder="AI 不得做什么？例如：不要修改测试文件；不要引入新依赖"
+          />
+        </label>
+        <label className="field">
+          <span className="field__label">前置上下文</span>
+          <textarea
+            rows={2}
+            value={payload.context ?? ""}
+            onChange={(e) => setPayload({ context: e.target.value })}
+            placeholder="运行前需要提供什么？例如：选中的代码 / 失败的测试日志 / git diff"
+          />
+        </label>
+        <label className="field">
+          <span className="field__label">示例（few-shot）</span>
+          <textarea
+            rows={3}
+            value={payload.examples ?? ""}
+            onChange={(e) => setPayload({ examples: e.target.value })}
+            placeholder={"输入：…\n输出：…（给 AI 看的范例，提升稳定性）"}
+          />
+        </label>
+        <label className="field field--narrow">
+          <span className="field__label">模型覆写</span>
+          <input
+            value={payload.model ?? ""}
+            onChange={(e) => setPayload({ model: e.target.value })}
+            placeholder="留空用全局设置，如 gpt-4o / deepseek-reasoner"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset className="fieldset">
         <legend>斜杠命令</legend>
         <p className="muted">在命令栏输入 <code>/</code> 加关键词即可唤起此 Loop。</p>
         <div className="row trigger-row">

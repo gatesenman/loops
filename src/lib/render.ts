@@ -37,6 +37,14 @@ export function renderLoop(
   if (p.goal) lines.push(`\n## Goal\n${fillTemplate(p.goal, values)}`);
   if (p.instructions)
     lines.push(`\n## Instructions\n${fillTemplate(p.instructions, values)}`);
+  if (p.context)
+    lines.push(`\n## Context\n${fillTemplate(p.context, values)}`);
+  if (p.constraints)
+    lines.push(`\n## Constraints\n${fillTemplate(p.constraints, values)}`);
+  if (p.outputFormat)
+    lines.push(`\n## Output format\n${fillTemplate(p.outputFormat, values)}`);
+  if (p.examples)
+    lines.push(`\n## Examples\n${fillTemplate(p.examples, values)}`);
   if (p.stopCondition)
     lines.push(`\n## Stop when\n${fillTemplate(p.stopCondition, values)}`);
   if (p.maxIterations)
