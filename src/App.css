@@ -1713,3 +1713,20 @@ code {
 .lint__item--pass { opacity: 0.65; }
 .lint__label { font-weight: 600; min-width: 56px; }
 .lint__msg { opacity: 0.85; }
+
+/* ---- Wizard advanced prompt-engineering section ---- */
+.wizard-adv {
+  margin: 12px 0;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.wizard-adv > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+  user-select: none;
+}
+.wizard-adv[open] > summary { margin-bottom: 10px; }

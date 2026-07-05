@@ -293,6 +293,14 @@ pub struct GeneratedLoop {
     pub instructions: String,
     pub stop_condition: String,
     pub max_iterations: u32,
+    #[serde(default)]
+    pub output_format: String,
+    #[serde(default)]
+    pub constraints: String,
+    #[serde(default)]
+    pub context: String,
+    #[serde(default)]
+    pub examples: String,
     pub trigger_keyword: String,
     pub tags: Vec<String>,
     pub variables: Vec<GeneratedVariable>,
@@ -319,6 +327,10 @@ Given a user's description, generate a well-structured Loop with:
 - instructions: step-by-step Chinese instructions for the AI, may use {{variable}} placeholders
 - stopCondition: when to stop iterating
 - maxIterations: reasonable default (1-20)
+- outputFormat: required output shape in Chinese (e.g. "markdown 列表", "纯 JSON", "只输出代码，不要解释")
+- constraints: guardrails in Chinese — what the AI must NOT do (e.g. "不要修改测试文件；不要引入新依赖")
+- context: what context the user should provide before running, in Chinese (e.g. "选中的代码", "失败的测试日志")
+- examples: one short few-shot input/output example in Chinese ("输入：…\n输出：…"); empty string if not useful
 - triggerKeyword: short English slash-command keyword (lowercase, no spaces)
 - tags: 1-3 English tags
 - variables: array of template variables used in goal/instructions (each has name, label in Chinese, type as "text"|"path"|"enum"|"number", required boolean, default string)

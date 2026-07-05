@@ -79,6 +79,10 @@ export default function LoopWizard({
         instructions: gen.instructions,
         stopCondition: gen.stopCondition,
         maxIterations: gen.maxIterations,
+        outputFormat: gen.outputFormat || undefined,
+        constraints: gen.constraints || undefined,
+        context: gen.context || undefined,
+        examples: gen.examples || undefined,
       } as LoopPayload,
     };
     setD(draft);
@@ -318,6 +322,44 @@ export default function LoopWizard({
               />
             </label>
           </div>
+          <details className="wizard-adv" open={!!(payload.outputFormat || payload.constraints || payload.context || payload.examples)}>
+            <summary>高级 Prompt 工程（可选）</summary>
+            <label className="field">
+              <span className="field__label">输出格式</span>
+              <input
+                value={payload.outputFormat ?? ""}
+                onChange={(e) => setPayload({ outputFormat: e.target.value })}
+                placeholder="例如：markdown 列表 / 纯 JSON / 只输出代码，不要解释"
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">约束 / 禁止事项</span>
+              <textarea
+                rows={2}
+                value={payload.constraints ?? ""}
+                onChange={(e) => setPayload({ constraints: e.target.value })}
+                placeholder="AI 不得做什么？例如：不要修改测试文件；不要引入新依赖"
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">前置上下文</span>
+              <textarea
+                rows={2}
+                value={payload.context ?? ""}
+                onChange={(e) => setPayload({ context: e.target.value })}
+                placeholder="运行前需要提供什么？例如：选中的代码 / 失败的测试日志"
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">示例（few-shot）</span>
+              <textarea
+                rows={3}
+                value={payload.examples ?? ""}
+                onChange={(e) => setPayload({ examples: e.target.value })}
+                placeholder={"输入：…\n输出：…（给 AI 看的范例，提升稳定性）"}
+              />
+            </label>
+          </details>
           {d.variables.length > 0 && (
             <p className="muted">
               该模板包含变量：

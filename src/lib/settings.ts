@@ -113,6 +113,10 @@ export interface GeneratedLoop {
   instructions: string;
   stopCondition: string;
   maxIterations: number;
+  outputFormat: string;
+  constraints: string;
+  context: string;
+  examples: string;
   triggerKeyword: string;
   tags: string[];
   variables: {
