@@ -195,6 +195,9 @@ pub fn run() {
             commands::export_assets,
             commands::import_assets,
             commands::generate_loop,
+            commands::chat_complete,
+            commands::fetch_fabric_patterns,
+            commands::fetch_fabric_pattern,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

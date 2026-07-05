@@ -116,3 +116,39 @@ export function exportAssets(ids: string[] = []): Promise<string> {
 export function importAssets(): Promise<string> {
   return invoke<string>("import_assets");
 }
+
+// ---------------------------------------------------------------------------
+// In-app Loop runner (generic chat completion)
+// ---------------------------------------------------------------------------
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export function chatComplete(
+  system: string,
+  messages: ChatMessage[],
+  ai: { provider: string; apiKey: string; model?: string; baseUrl?: string },
+): Promise<string> {
+  return invoke<string>("chat_complete", {
+    system,
+    messages,
+    provider: ai.provider,
+    apiKey: ai.apiKey,
+    model: ai.model || null,
+    baseUrl: ai.baseUrl || null,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fabric pattern import (github.com/danielmiessler/fabric)
+// ---------------------------------------------------------------------------
+
+export function fetchFabricPatterns(): Promise<string[]> {
+  return invoke<string[]>("fetch_fabric_patterns");
+}
+
+export function fetchFabricPattern(name: string): Promise<string> {
+  return invoke<string>("fetch_fabric_pattern", { name });
+}
