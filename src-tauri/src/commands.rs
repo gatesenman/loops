@@ -386,6 +386,219 @@ fn extract_json(text: &str) -> Result<GeneratedLoop, String> {
         .map_err(|e| format!("Failed to parse AI response as JSON: {e}\n\nRaw: {json_str}"))
 }
 
+// ---------------------------------------------------------------------------
+// Generic chat completion (in-app Loop runner)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub role: String, // "user" | "assistant"
+    pub content: String,
+}
+
+/// Sends a multi-turn conversation to the configured AI provider and returns
+/// the assistant's reply text. Powers the in-app Loop runner ("试跑").
+#[tauri::command]
+pub async fn chat_complete(
+    system: String,
+    messages: Vec<ChatMessage>,
+    provider: String,
+    api_key: String,
+    model: Option<String>,
+    base_url: Option<String>,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    match provider.as_str() {
+        "anthropic" => {
+            let m = model.as_deref().unwrap_or("claude-sonnet-4-20250514");
+            let url = base_url
+                .as_deref()
+                .unwrap_or("https://api.anthropic.com/v1/messages");
+            let msgs: Vec<serde_json::Value> = messages
+                .iter()
+                .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
+                .collect();
+            let body = serde_json::json!({
+                "model": m,
+                "max_tokens": 4096,
+                "system": system,
+                "messages": msgs
+            });
+            let resp = client
+                .post(url)
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", "2023-06-01")
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {e}"))?;
+            let status = resp.status();
+            let text = resp.text().await.map_err(|e| format!("Read body failed: {e}"))?;
+            if !status.is_success() {
+                return Err(format!("Anthropic API error ({status}): {text}"));
+            }
+            let v: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("Parse response failed: {e}"))?;
+            Ok(v["content"][0]["text"].as_str().unwrap_or("").to_string())
+        }
+        "gemini" => {
+            let m = model.as_deref().unwrap_or("gemini-2.5-flash");
+            let url = base_url.unwrap_or_else(|| {
+                format!(
+                    "https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
+                )
+            });
+            let contents: Vec<serde_json::Value> = messages
+                .iter()
+                .map(|m| {
+                    let role = if m.role == "assistant" { "model" } else { "user" };
+                    serde_json::json!({ "role": role, "parts": [{ "text": m.content }] })
+                })
+                .collect();
+            let body = serde_json::json!({
+                "systemInstruction": { "parts": [{ "text": system }] },
+                "contents": contents,
+                "generationConfig": { "temperature": 0.7, "maxOutputTokens": 4096 }
+            });
+            let resp = client
+                .post(&url)
+                .query(&[("key", &api_key)])
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {e}"))?;
+            let status = resp.status();
+            let text = resp.text().await.map_err(|e| format!("Read body failed: {e}"))?;
+            if !status.is_success() {
+                return Err(format!("Gemini API error ({status}): {text}"));
+            }
+            let v: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("Parse response failed: {e}"))?;
+            Ok(v["candidates"][0]["content"]["parts"][0]["text"]
+                .as_str()
+                .unwrap_or("")
+                .to_string())
+        }
+        // "openai" | "deepseek" | "custom" and anything else: OpenAI-compatible
+        _ => {
+            let default_url = match provider.as_str() {
+                "deepseek" => "https://api.deepseek.com/v1/chat/completions",
+                _ => "https://api.openai.com/v1/chat/completions",
+            };
+            let url = base_url.as_deref().unwrap_or(default_url);
+            let default_model = match provider.as_str() {
+                "deepseek" => "deepseek-chat",
+                _ => "gpt-4o-mini",
+            };
+            let m = model.as_deref().unwrap_or(default_model);
+            let mut msgs = vec![serde_json::json!({ "role": "system", "content": system })];
+            msgs.extend(
+                messages
+                    .iter()
+                    .map(|m| serde_json::json!({ "role": m.role, "content": m.content })),
+            );
+            let body = serde_json::json!({
+                "model": m,
+                "messages": msgs,
+                "temperature": 0.7,
+                "max_tokens": 4096
+            });
+            let resp = client
+                .post(url)
+                .header("Authorization", format!("Bearer {api_key}"))
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {e}"))?;
+            let status = resp.status();
+            let text = resp.text().await.map_err(|e| format!("Read body failed: {e}"))?;
+            if !status.is_success() {
+                return Err(format!("API error ({status}): {text}"));
+            }
+            let v: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("Parse response failed: {e}"))?;
+            Ok(v["choices"][0]["message"]["content"]
+                .as_str()
+                .unwrap_or("")
+                .to_string())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fabric pattern import (github.com/danielmiessler/fabric)
+// ---------------------------------------------------------------------------
+
+const FABRIC_REPO: &str = "danielmiessler/fabric";
+const FABRIC_UA: &str = "loops-desktop";
+
+/// Lists the pattern names in the fabric repo (each pattern is a directory
+/// containing a system.md prompt).
+#[tauri::command]
+pub async fn fetch_fabric_patterns() -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    for dir in ["data/patterns", "patterns"] {
+        let url = format!("https://api.github.com/repos/{FABRIC_REPO}/contents/{dir}");
+        let resp = client
+            .get(&url)
+            .header("User-Agent", FABRIC_UA)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {e}"))?;
+        if !resp.status().is_success() {
+            continue;
+        }
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse response failed: {e}"))?;
+        let names: Vec<String> = v
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter(|e| e["type"].as_str() == Some("dir"))
+                    .filter_map(|e| e["name"].as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !names.is_empty() {
+            return Ok(names);
+        }
+    }
+    Err("无法获取 Fabric patterns 列表（GitHub API 不可达或结构已变化）".to_string())
+}
+
+/// Fetches a single pattern's system.md prompt text.
+#[tauri::command]
+pub async fn fetch_fabric_pattern(name: String) -> Result<String, String> {
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err("非法的 pattern 名称".to_string());
+    }
+    let client = reqwest::Client::new();
+    for dir in ["data/patterns", "patterns"] {
+        let url = format!(
+            "https://raw.githubusercontent.com/{FABRIC_REPO}/main/{dir}/{name}/system.md"
+        );
+        let resp = client
+            .get(&url)
+            .header("User-Agent", FABRIC_UA)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {e}"))?;
+        if resp.status().is_success() {
+            return resp.text().await.map_err(|e| format!("Read body failed: {e}"));
+        }
+    }
+    Err(format!("无法获取 pattern「{name}」的 system.md"))
+}
+
 #[tauri::command]
 pub async fn generate_loop(
     prompt: String,

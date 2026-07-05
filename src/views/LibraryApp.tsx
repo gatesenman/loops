@@ -14,6 +14,7 @@ import { emptyLoopDraft, slugify } from "../lib/draft";
 import { DISCOVER_LOOPS, discoverToDraft } from "../lib/discover";
 import LoopCard from "../components/LoopCard";
 import DiscoverCard from "../components/DiscoverCard";
+import FabricImport from "../components/FabricImport";
 import LoopEditor from "../components/LoopEditor";
 import LoopWizard from "../components/LoopWizard";
 import LoopDetail from "../components/LoopDetail";
@@ -318,6 +319,13 @@ export default function LibraryApp() {
         <p className="muted discover__hint">
           平台精选 Loop。点「导入」即可复制到你的本地库再自由编辑。
         </p>
+        <FabricImport
+          importedSlugs={importedSlugs}
+          onImport={async (draft) => {
+            await saveAsset(draft);
+            await refresh();
+          }}
+        />
         {discoverFiltered.length === 0 ? (
           <div className="empty">
             <p>没有匹配的平台 Loop。</p>

@@ -12,6 +12,7 @@ import {
   savePreset,
 } from "../lib/api";
 import VariableForm from "./VariableForm";
+import RunnerPanel from "./RunnerPanel";
 import ConfirmDialog from "./ConfirmDialog";
 import { showToast } from "./Toast";
 
@@ -41,6 +42,7 @@ export default function LoopDetail({
   const [presets, setPresets] = useState<Preset[]>([]);
   const [savingPreset, setSavingPreset] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const [showRunner, setShowRunner] = useState(false);
 
   useEffect(() => {
     if (asset.variables.length > 0) {
@@ -238,7 +240,21 @@ export default function LoopDetail({
             ? (autoPaste ? "已粘贴 ✓" : "已复制到剪贴板 ✓")
             : (autoPaste ? "运行 → 自动粘贴" : "运行 → 复制到剪贴板")}
         </button>
+        <button
+          className="btn"
+          onClick={() => setShowRunner((v) => !v)}
+          disabled={missingRequired.length > 0}
+          title={
+            missingRequired.length > 0
+              ? "请先填写必填变量"
+              : "在应用内用已配置的 AI 直接执行这个 Loop"
+          }
+        >
+          {showRunner ? "收起试跑" : "▶ 试跑 (AI)"}
+        </button>
       </div>
+
+      {showRunner && <RunnerPanel asset={asset} rendered={rendered} />}
 
       {confirmingDelete && (
         <ConfirmDialog
