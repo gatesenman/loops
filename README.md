@@ -22,17 +22,6 @@ sort/favorites, import/export and one-click copy.
 
 ![Discover](docs/screenshots/discover.png)
 
-**Loop detail** — fields, trigger/scope, a standardness lint score with an
-actionable checklist, a live rendered preview, and run / AI dry-run actions.
-
-![Loop detail](docs/screenshots/loop-detail.png)
-![Loop preview](docs/screenshots/loop-preview.png)
-
-**New Loop wizard** — start from a starter template or let AI draft the loop,
-then fill content, triggers/scope and validate before saving.
-
-![Wizard](docs/screenshots/wizard.png)
-
 **Settings** — accent color, default visibility, global hotkey, auto-paste, AI
 provider/model/key, and local data management.
 
