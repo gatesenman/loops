@@ -29,6 +29,9 @@ provider/model/key, and local data management.
 
 ![Settings](docs/screenshots/settings.png)
 
+> Screenshots were re-captured from the current code by running the Tauri app (WebKitGTK) on Linux under Xvfb. The 4 loops in the library were imported from the built-in samples on the Discover page. The app UI is Chinese only (there is no language switch), so both READMEs use the same screenshots.
+> Known issue: under WebKitGTK on Linux, the dropdowns on the Settings page (global hotkey, AI provider) are drawn with the native white style and the selected value is not visible.
+
 ## Features
 
 - **Local loop library** — create, edit, duplicate, delete; search by title,
