@@ -30,6 +30,9 @@
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* WebKitGTK otherwise treats the page as light and paints native
+     <select> controls with a white background, hiding the light text. */
+  color-scheme: dark;
 }
 
 * {
@@ -730,8 +733,13 @@ textarea {
   padding: 8px 11px;
   font-size: 13px;
   font-family: inherit;
+  color-scheme: dark;
   transition: border-color 0.16s ease, box-shadow 0.16s ease,
     background 0.16s ease;
+}
+select option {
+  background-color: var(--panel);
+  color: var(--text);
 }
 input::placeholder,
 textarea::placeholder {
@@ -1183,6 +1191,11 @@ code {
   padding: 7px 11px;
   font-size: 13px;
   cursor: pointer;
+  color-scheme: dark;
+}
+.settings__select option {
+  background-color: var(--panel-2);
+  color: var(--text);
 }
 .settings__select:focus {
   outline: none;
