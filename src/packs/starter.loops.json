@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "exported_at": "1970-01-01T00:00:00.000Z",
+  "kind": "loops-pack",
+  "loops": [
+    {
+      "id": "fix-tests",
+      "name": "修复失败测试",
+      "description": "反复运行测试、定位并修复失败，直到全部通过。",
+      "triggerKeyword": "fixtests",
+      "tags": ["testing", "ci"],
+      "variables": [
+        {
+          "name": "path",
+          "label": "测试路径",
+          "type": "path",
+          "required": true,
+          "default": "tests/",
+          "options": []
+        }
+      ],
+      "payload": {
+        "goal": "让 {{path}} 下的所有测试通过。",
+        "instructions": "运行 {{path}} 的测试，阅读失败信息，做最小改动修复，重复直到全部通过。每轮简述你改了什么、为什么。",
+        "stopCondition": "所有测试以退出码 0 通过。",
+        "maxIterations": 10
+      }
+    },
+    {
+      "id": "code-review",
+      "name": "代码评审",
+      "description": "对一个改动/PR 做结构化评审，给出可执行建议。",
+      "triggerKeyword": "review",
+      "tags": ["review"],
+      "variables": [
+        {
+          "name": "target",
+          "label": "评审对象",
+          "type": "text",
+          "required": true,
+          "default": "当前改动",
+          "options": []
+        }
+      ],
+      "payload": {
+        "goal": "对 {{target}} 进行一次彻底的代码评审。",
+        "instructions": "阅读 {{target}} 的改动，按正确性、可读性、安全和测试缺口给出具体建议。",
+        "stopCondition": "已经给出可执行的评审结论。",
+        "maxIterations": 6
+      }
+    }
+  ]
+}

@@ -32,6 +32,7 @@ provider/model/key, and local data management.
 - **Local loop library** — create, edit, duplicate, delete; search by title,
   description, tags or trigger; filter by visibility; sort by updated / recently
   used / favorites first.
+- **Starter pack (`.loops.json`)** — a portable, validated pack of built-in templates (`src/packs/starter.loops.json`) that can be parsed and re-serialized without opening the Tauri file dialog. Version 0.2.0.
 - **Guided wizard** — 4 steps (template → content → trigger & scope → validate),
   with starter templates (fix tests, code review, safe refactor, write tests,
   debug, document) and an optional AI draft.
