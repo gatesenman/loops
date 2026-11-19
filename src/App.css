@@ -39,6 +39,30 @@
   box-sizing: border-box;
 }
 
+
+/* Keyboard focus gets a solid ring. Existing :focus border/box-shadow
+   styles stay for pointer users; those rules set outline: none, so the
+   :focus-visible selectors below must match or beat that specificity.
+   Do not remove color-scheme: dark or the select option colors — they
+   keep Linux WebKitGTK dropdowns readable. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.card__body:focus-visible,
+.tab:focus-visible,
+.swatch:focus-visible,
+.cmdbar__input:focus-visible,
+.toolbar__search input:focus-visible,
+.settings__select:focus-visible,
+.settings__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+
 html,
 body,
 #root {

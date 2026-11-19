@@ -10,8 +10,13 @@
     "core:window:allow-set-focus",
     "core:window:allow-set-size",
     "core:window:allow-start-dragging",
-    "opener:default",
-    "opener:allow-open-url",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://loops.elorm.xyz" },
+        { "url": "https://loops.elorm.xyz/*" }
+      ]
+    },
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "global-shortcut:allow-register",
