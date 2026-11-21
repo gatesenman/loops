@@ -1,5 +1,7 @@
 # Loops Desktop
 
+**English** · [简体中文](README.zh-CN.md)
+
 A hotkey-driven command bar for browsing, creating, and injecting reusable AI
 assets into the AI apps you already use (Claude Code, Cursor, Codex, Gemini CLI,
 OpenCode). Inspired by the agent-loop catalog at
@@ -26,6 +28,9 @@ sort/favorites, import/export and one-click copy.
 provider/model/key, and local data management.
 
 ![Settings](docs/screenshots/settings.png)
+
+> Screenshots were re-captured from the current code by running the Tauri app (WebKitGTK) on Linux under Xvfb. The 4 loops in the library were imported from the built-in samples on the Discover page. The app UI is Chinese only (there is no language switch), so both READMEs use the same screenshots.
+> Known issue: under WebKitGTK on Linux, the dropdowns on the Settings page (global hotkey, AI provider) are drawn with the native white style and the selected value is not visible.
 
 ## Features
 
@@ -162,6 +167,22 @@ Not implemented yet:
 - the `@ # !` trigger providers (only `/` is wired up),
 - foreground-app scope filtering is captured but not yet enforced per loop,
 - a public/remote marketplace — `visibility` is local metadata only.
+
+## Configuration
+
+There are no environment variables or config files to edit — everything is set in **Settings** inside the app (accent color, default visibility, global hotkey — `Alt+Space` by default, auto-paste, AI provider / model / API key, data management).
+
+All data (loops, settings, presets, usage stats, API keys) is stored in a local SQLite file `loops.db` in Tauri's app data directory for the identifier `xyz.loops.desktop`:
+
+| Platform | Path |
+| --- | --- |
+| Linux | `~/.local/share/xyz.loops.desktop/loops.db` |
+| macOS | `~/Library/Application Support/xyz.loops.desktop/loops.db` |
+| Windows | `%APPDATA%\xyz.loops.desktop\loops.db` |
+
+## Contributing
+
+Issues and pull requests are welcome. Before submitting, run `npm run typecheck`, `npm run build` and `cargo check` in `src-tauri/`. When you change the `Asset` shape, keep `src/types/asset.ts` and `src-tauri/src/model.rs` in sync.
 
 ## License
 
