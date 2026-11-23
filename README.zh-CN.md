@@ -6,6 +6,15 @@
 
 所有数据都保存在本地 SQLite 数据库中——无需账号、没有服务器、不做同步。AI 功能是可选的，只会调用你用自己的 API Key 配置的提供商。
 
+## 下载
+
+Windows 安装包在 [GitHub Releases v0.1.0](https://github.com/gatesenman/loops/releases/tag/v0.1.0)：
+
+- [Loops.Desktop_0.1.0_x64-setup.exe](https://github.com/gatesenman/loops/releases/download/v0.1.0/Loops.Desktop_0.1.0_x64-setup.exe)（NSIS，Windows x64）
+- [Loops.Desktop_0.1.0_x64_en-US.msi](https://github.com/gatesenman/loops/releases/download/v0.1.0/Loops.Desktop_0.1.0_x64_en-US.msi)
+
+该 Release 没有附 SHA256 文件，本轮未下载安装包计算哈希。下面的截图是在 Linux（Xvfb / WebKitGTK）上从 Tauri 应用实拍、并导入内置示例 Loop，**不是**安装上述 Windows Setup/MSI 之后的画面。
+
 ## 界面截图
 
 **资产库（Library）**：本地 loop 集合，支持搜索、可见性筛选、排序 / 收藏、导入导出和一键复制。
