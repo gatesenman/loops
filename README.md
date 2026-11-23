@@ -12,6 +12,15 @@ Everything lives in a local SQLite database — no account, no server, no sync.
 The AI features are optional and only call the provider you configure with your
 own API key.
 
+## Download
+
+Windows installers for **v0.1.0** are on [GitHub Releases](https://github.com/gatesenman/loops/releases/tag/v0.1.0):
+
+- [Loops.Desktop_0.1.0_x64-setup.exe](https://github.com/gatesenman/loops/releases/download/v0.1.0/Loops.Desktop_0.1.0_x64-setup.exe) (NSIS, Windows x64)
+- [Loops.Desktop_0.1.0_x64_en-US.msi](https://github.com/gatesenman/loops/releases/download/v0.1.0/Loops.Desktop_0.1.0_x64_en-US.msi)
+
+There is no SHA256 file on that release. This pass did not download the binaries to hash them. The screenshots below were captured from the Tauri app on Linux (WebKitGTK, Xvfb) using built-in sample loops; they are not screenshots taken after installing the Windows setup/MSI.
+
 ## Screenshots
 
 **Library** — your local loop collection with search, visibility filters,
